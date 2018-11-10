@@ -1,0 +1,12 @@
+#main-img {
+  display: none;
+  width: 600px;
+}
+
+.img-canvas {
+  border: 1px solid #000000;
+}
+
+.before-after-text {
+  font-size: 24px;
+}
