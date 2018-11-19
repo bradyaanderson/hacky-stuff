@@ -1,22 +1,20 @@
-function initCanvasses(img) {
-  setCanvasDims(bc, img);
-  setCanvasDims(ac, img);
+function initCanvas(c, img) {
+  setCanvasDims(c, img);
 
-  bctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, bc.width, bc.height);
-  actx.drawImage(img, 0, 0, img.width, img.height, 0, 0, ac.width, ac.height);
+  var ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, img.width, img.height, 0, 0, c.width, c.height);
 }
 
-// fit image to canvas max dimensions
 function setCanvasDims(canvas, img) {
   var max_dim = 400;
 
   var new_dims = {w: 0, height: 0};
   if (img.width >= img.height) {
     new_dims.w = (img.width <= max_dim) ? img.width : max_dim;
-    new_dims.h = new_dims.w * (img.height / img.width)
+    new_dims.h = new_dims.w * (img.height / img.width);
   } else {
     new_dims.h = (img.height <= max_dim) ? img.height : max_dim;
-    new_dims.w = new_dims.h * (img.width / img.height)
+    new_dims.w = new_dims.h * (img.width / img.height);
   }
 
   canvas.width = Math.round(new_dims.w);
@@ -89,10 +87,6 @@ function decodeLength(c) {
   return toDecimal(lengthBin.slice(0,32));
 }
 
-function toBinary(decNum) {
-  return parseInt(decNum,10).toString(2);
-}
-
 function encodeMessage(c, msg) {
   var ctx = c.getContext('2d');
 
@@ -147,6 +141,10 @@ function toDecimal(binary) {
   return parseInt(binary,2).toString(10);
 }
 
+function toBinary(decNum) {
+  return parseInt(decNum,10).toString(2);
+}
+
 function getCanvasLocation(c, n) {
   var location = {x: n % c.width, y: Math.floor(n / c.width)};
   if (location.y > c.height) {
@@ -161,18 +159,19 @@ var img = document.getElementById('main-img');
 
 // before canvas
 var bc = document.getElementById('before-img');
-var bctx = bc.getContext('2d');
 
 // after canvas
 var ac = document.getElementById('after-img');
-var actx = ac.getContext('2d');
 
 // check if image is drawn, so that it can drawn to canvas
 if (img.complete) {
-  initCanvasses(img);
+  initCanvas(bc, img);
+  initCanvas(ac, img);
+
 } else {
   img.addEventListener('load', function () {
-    initCanvasses(this);
+    initCanvas(bc, this);
+    initCanvas(ac, this);
   });
 }
 
