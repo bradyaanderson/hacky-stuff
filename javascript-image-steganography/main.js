@@ -55,13 +55,16 @@ function decodePixel(ctx, location) {
   return decode;
 }
 
-function updateAfter() {
-  var message = document.getElementById('message-input').value;
-  encodeLength(message.length);
-  console.log(decodeLength());
+function updateAfterCanvas(c) {
+  var ctx = c.getContext('2d');
+  var msg = document.getElementById('message-input').value;
+  encodeLength(ctx, msg.length);
+  encodeMessage(c, msg);
+
+  console.log(decodeMessage(c));
 }
 
-function encodeLength(newLength) {
+function encodeLength(ctx, newLength) {
   var binaryLengthStr = zeroFill(toBinary(newLength), 32);
   var tempStr = binaryLengthStr;
 
@@ -69,17 +72,18 @@ function encodeLength(newLength) {
   while (tempStr.length > 0) {
     var slice = tempStr.slice(0, 6);
     var tempStr = tempStr.slice(6);
-    encodePixel(actx, getCanvasLocation(ac, i), slice);
+    encodePixel(ctx, getCanvasLocation(ac, i), slice);
     i++;
   }
 }
 
-function decodeLength() {
+function decodeLength(c) {
+  var ctx = c.getContext('2d');
 
-  var lengthBin = ""
+  var lengthBin = "";
   var i = 0;
   while (lengthBin.length < 32) {
-    lengthBin = lengthBin + decodePixel(actx, getCanvasLocation(ac, i));
+    lengthBin = lengthBin + decodePixel(ctx, getCanvasLocation(c, i));
     i++;
   }
   return toDecimal(lengthBin.slice(0,32));
@@ -87,6 +91,46 @@ function decodeLength() {
 
 function toBinary(decNum) {
   return parseInt(decNum,10).toString(2);
+}
+
+function encodeMessage(c, msg) {
+  var ctx = c.getContext('2d');
+
+  var binMsg = "";
+  for (var i = 0; i < msg.length; i++) {
+    binMsg = binMsg.concat(zeroFill(toBinary(msg.charCodeAt(i)), 8));
+  }
+
+  var j = 0;
+  while (binMsg.length > 0) {
+    var slice = binMsg.slice(0, 6);
+    binMsg = binMsg.slice(6);
+    encodePixel(ctx, getCanvasLocation(c, 6 + j), slice);
+    j++;
+  }
+}
+
+function decodeMessage(c) {
+  var ctx = c.getContext('2d');
+
+  var msg = "";
+  var msgLength = decodeLength(c);
+  var parseLength = Math.ceil(msgLength * 4/3); 
+
+  var binMsg = "";
+  var i = 0;
+  while (i < parseLength) {
+    binMsg = binMsg + decodePixel(ctx, getCanvasLocation(c, 6 + i));
+    i++;
+  }
+
+  for (var j = 0; j < msgLength; j++) {
+    var slice = binMsg.slice(0, 8);
+    binMsg = binMsg.slice(8);
+    msg = msg.concat(String.fromCharCode(toDecimal(slice)));
+  }
+
+  return msg;
 }
 
 function zeroFill(number, width)
@@ -125,7 +169,7 @@ var actx = ac.getContext('2d');
 
 // check if image is drawn, so that it can drawn to canvas
 if (img.complete) {
-  initCanvasses(img)
+  initCanvasses(img);
 } else {
   img.addEventListener('load', function () {
     initCanvasses(this);
@@ -134,5 +178,5 @@ if (img.complete) {
 
 // setup textarea listener
 $("#message-input").on('change keyup paste', function() {
-  updateAfter();
+  updateAfterCanvas(ac);
 });
