@@ -1,3 +1,134 @@
+class canvasSteg {
+
+  constructor(c) {
+    this.c = c;
+    this.ctx = c.getContext('2d');
+
+    this.LENGTHSIZE = 32;
+    this.CHARSIZE = 8;
+    this.MAXPIXELDATA = 6;
+    this.MSGSTART = Math.ceil(this.LENGTHSIZE / this.MAXPIXELDATA);
+  }
+
+  getCanvasLocation(n) {
+  var location = {x: n % this.c.width, y: Math.floor(n / this.c.width)};
+  if (location.y > this.c.height) {
+    return -1;
+  }
+  
+  return location;
+}
+
+  getPixelRGBA(location) {
+    return this.ctx.getImageData(location.x, location.y, 1, 1).data;
+  }
+
+  setPixelRGBA(location, pixelData) {
+    this.ctx.fillStyle = "rgba(" + pixelData[0] + "," + pixelData[1] + "," + pixelData[2] + "," + pixelData[3] + ")";
+    this.ctx.fillRect(location.x, location.y, 1, 1);
+  }
+
+  encodePixel(location, data) {
+    var newPixelData = this.getPixelRGBA(location);
+
+    for (var i = 0; i < 3; i++) {
+      var curBinary = this.zeroFill(this.toBinary(newPixelData[i]), 8);
+      var newBinary = curBinary;
+      newBinary = newBinary.slice(0, this.MAXPIXELDATA).concat(data[i * 2] || 0, data[i * 2 + 1] || 0);
+      newPixelData[i] = this.toDecimal(newBinary);
+    }
+    this.setPixelRGBA(location, newPixelData);
+  }
+
+  decodePixel(location) {
+    var pixelData = this.getPixelRGBA(location);
+
+    var decode = "";
+    for (var i = 0; i < 3; i++) {
+      var binary = this.zeroFill(this.toBinary(pixelData[i]), 8);
+      decode = decode + binary.slice(this.MAXPIXELDATA);
+    }
+    return decode;
+  }
+
+  encodeLength(length) {
+    var binaryLengthStr = this.zeroFill(this.toBinary(length), this.LENGTHSIZE);
+    var tempStr = binaryLengthStr;
+
+    var i = 0;
+    while (tempStr.length > 0) {
+      var slice = tempStr.slice(0, this.MAXPIXELDATA);
+      tempStr = tempStr.slice(this.MAXPIXELDATA);
+      this.encodePixel(this.getCanvasLocation(i), slice);
+      i++;
+    }
+  }
+
+  decodeLength() {
+    var lengthBin = "";
+    var i = 0;
+    while (lengthBin.length < this.LENGTHSIZE) {
+      lengthBin = lengthBin + this.decodePixel(this.getCanvasLocation(i));
+      i++;
+    }
+    return this.toDecimal(lengthBin.slice(0, this.LENGTHSIZE));
+  }
+
+  encodeMessage(msg) {
+    this.encodeLength(msg.length);
+
+    var binMsg = "";
+    for (var i = 0; i < msg.length; i++) {
+      binMsg = binMsg.concat(this.zeroFill(this.toBinary(msg.charCodeAt(i)), this.CHARSIZE));
+    }
+
+    var j = 0;
+    while (binMsg.length > 0) {
+      var slice = binMsg.slice(0, this.MAXPIXELDATA);
+      binMsg = binMsg.slice(this.MAXPIXELDATA);
+      this.encodePixel(this.getCanvasLocation(j + this.MSGSTART), slice);
+      j++;
+    }
+  }
+
+  decodeMessage() {
+    var msg = "";
+    var msgLength = this.decodeLength();
+    var parseLength = Math.ceil(msgLength * (this.CHARSIZE / this.MAXPIXELDATA));
+
+    var binMsg = "";
+    var i = 0;
+    while (i < parseLength) {
+      binMsg = binMsg + this.decodePixel(this.getCanvasLocation(i + this.MSGSTART));
+      i++;
+    }
+
+    for (var j = 0; j < msgLength; j++) {
+      var slice = binMsg.slice(0, this.CHARSIZE);
+      binMsg = binMsg.slice(this.CHARSIZE);
+      msg = msg.concat(String.fromCharCode(this.toDecimal(slice)));
+    }
+
+    return msg;
+  }
+
+  zeroFill(number, width) {
+    width -= number.toString().length;
+    if (width > 0) {
+      return new Array(width + (/\./.test(number) ? 2 : 1)).join('0') + number;
+    }
+    return number + ""; // always return a string
+  }
+
+  toDecimal(binary) {
+    return parseInt(binary, 2).toString(10);
+  }
+
+  toBinary(decNum) {
+    return parseInt(decNum, 10).toString(2);
+  }
+}
+
 function initCanvas(c, img) {
   setCanvasDims(c, img);
 
@@ -21,139 +152,6 @@ function setCanvasDims(canvas, img) {
   canvas.height = Math.round(new_dims.h);
 }
 
-function getPixelData(ctx, location) {
-  return ctx.getImageData(location.x, location.y, 1, 1).data;
-}
-
-function changePixelData(ctx, location, pixelData) {
-  ctx.fillStyle = "rgba(" + pixelData[0] + "," + pixelData[1] + "," + pixelData[2] + "," + pixelData[3] + ")";
-  ctx.fillRect(location.x, location.y, 1, 1 );
-}
-
-function encodePixel(ctx, location, data) {
-  var newPixelData = getPixelData(ctx, location);
-
-  for (var i = 0; i < 3; i++) {
-    var curBinary = zeroFill(toBinary(newPixelData[i]), 8);
-    var newBinary = curBinary;
-    newBinary = newBinary.slice(0,6).concat(data[i*2] || 0, data[i*2 + 1] || 0);
-    newPixelData[i] = toDecimal(newBinary);
-  }
-  changePixelData(ctx, location, newPixelData)
-}
-
-function decodePixel(ctx, location) {
-  var pixelData = getPixelData(ctx, location);
-
-  var decode = "";
-  for (var i = 0; i < 3; i++) {
-    var binary = zeroFill(toBinary(pixelData[i]), 8);
-    decode = decode + binary.slice(6);
-  }
-  return decode;
-}
-
-function updateAfterCanvas(c) {
-  var ctx = c.getContext('2d');
-  var msg = document.getElementById('message-input').value;
-  encodeLength(ctx, msg.length);
-  encodeMessage(c, msg);
-
-  console.log(decodeMessage(c));
-}
-
-function encodeLength(ctx, newLength) {
-  var binaryLengthStr = zeroFill(toBinary(newLength), 32);
-  var tempStr = binaryLengthStr;
-
-  var i = 0;
-  while (tempStr.length > 0) {
-    var slice = tempStr.slice(0, 6);
-    var tempStr = tempStr.slice(6);
-    encodePixel(ctx, getCanvasLocation(ac, i), slice);
-    i++;
-  }
-}
-
-function decodeLength(c) {
-  var ctx = c.getContext('2d');
-
-  var lengthBin = "";
-  var i = 0;
-  while (lengthBin.length < 32) {
-    lengthBin = lengthBin + decodePixel(ctx, getCanvasLocation(c, i));
-    i++;
-  }
-  return toDecimal(lengthBin.slice(0,32));
-}
-
-function encodeMessage(c, msg) {
-  var ctx = c.getContext('2d');
-
-  var binMsg = "";
-  for (var i = 0; i < msg.length; i++) {
-    binMsg = binMsg.concat(zeroFill(toBinary(msg.charCodeAt(i)), 8));
-  }
-
-  var j = 0;
-  while (binMsg.length > 0) {
-    var slice = binMsg.slice(0, 6);
-    binMsg = binMsg.slice(6);
-    encodePixel(ctx, getCanvasLocation(c, 6 + j), slice);
-    j++;
-  }
-}
-
-function decodeMessage(c) {
-  var ctx = c.getContext('2d');
-
-  var msg = "";
-  var msgLength = decodeLength(c);
-  var parseLength = Math.ceil(msgLength * 4/3); 
-
-  var binMsg = "";
-  var i = 0;
-  while (i < parseLength) {
-    binMsg = binMsg + decodePixel(ctx, getCanvasLocation(c, 6 + i));
-    i++;
-  }
-
-  for (var j = 0; j < msgLength; j++) {
-    var slice = binMsg.slice(0, 8);
-    binMsg = binMsg.slice(8);
-    msg = msg.concat(String.fromCharCode(toDecimal(slice)));
-  }
-
-  return msg;
-}
-
-function zeroFill(number, width)
-{
-  width -= number.toString().length;
-  if ( width > 0 )
-  {
-    return new Array( width + (/\./.test( number ) ? 2 : 1) ).join( '0' ) + number;
-  }
-  return number + ""; // always return a string
-}
-
-function toDecimal(binary) {
-  return parseInt(binary,2).toString(10);
-}
-
-function toBinary(decNum) {
-  return parseInt(decNum,10).toString(2);
-}
-
-function getCanvasLocation(c, n) {
-  var location = {x: n % c.width, y: Math.floor(n / c.width)};
-  if (location.y > c.height) {
-    return -1;
-  }
-  
-  return location;
-}
-
 // grab image and canvas
 var img = document.getElementById('main-img');
 
@@ -162,6 +160,8 @@ var bc = document.getElementById('before-img');
 
 // after canvas
 var ac = document.getElementById('after-img');
+
+var cs = new canvasSteg(ac);
 
 // check if image is drawn, so that it can drawn to canvas
 if (img.complete) {
@@ -177,5 +177,7 @@ if (img.complete) {
 
 // setup textarea listener
 $("#message-input").on('change keyup paste', function() {
-  updateAfterCanvas(ac);
+  var input = document.getElementById('message-input').value;
+  cs.encodeMessage(input);
+  console.log(cs.decodeMessage());
 });
